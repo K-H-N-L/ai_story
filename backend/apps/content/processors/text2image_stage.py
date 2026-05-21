@@ -18,6 +18,8 @@ from django.conf import settings
 from jinja2 import Template, TemplateError
 
 from core.ai_client.factory import create_ai_client
+from core.ai_client.image_service import ImageGenerationService
+from core.ai_client.schemas import Text2ImageRequest
 from core.pipeline.base import PipelineContext, StageProcessor
 from django.utils import timezone
 
@@ -84,7 +86,7 @@ class Text2ImageStageProcessor(StageProcessor):
                 return False
 
             # 检查是否有可用的文生图模型
-            provider = await self._get_text2image_provider(project)
+            provider = self._get_text2image_provider(project)
             if not provider:
                 logger.error(f"项目 {context.project_id} 未配置文生图模型")
                 return False
@@ -727,8 +729,8 @@ class Text2ImageStageProcessor(StageProcessor):
         project: Project,
         storyboard: dict,
         provider: ModelProvider,
-        ratio: str = "9:16",
-        resolution: str = "2k"
+        ratio: Optional[str] = None,
+        resolution: Optional[str] = None
     ) -> Optional[GeneratedImage]:
         """
         为单个分镜生成图片
@@ -749,23 +751,23 @@ class Text2ImageStageProcessor(StageProcessor):
             # 构建提示词
             prompt_payload = self._build_generation_prompt_payload(project, storyboard)
             prompt = prompt_payload['prompt']
-            model_name = provider.model_name
-            api_key = provider.api_key
-            api_url = provider.api_url
+            runtime_overrides = {}
+            if ratio not in (None, ''):
+                runtime_overrides['ratio'] = ratio
+            if resolution not in (None, ''):
+                runtime_overrides['resolution'] = resolution
+
             client_params = self._resolve_generation_client_params(
                 project,
                 provider,
-                runtime_overrides={
-                    'ratio': ratio,
-                    'resolution': resolution,
-                },
+                runtime_overrides=runtime_overrides,
             )
             generation_params = {
-                'model': model_name,
+                'model': provider.model_name,
                 'prompt': prompt,
                 'image': prompt_payload['image'],
-                'ratio': client_params.get('ratio', ratio),
-                'resolution': client_params.get('resolution', resolution),
+                'ratio': client_params.get('ratio', ratio or '1:1'),
+                'resolution': client_params.get('resolution', resolution or '2k'),
                 'width': client_params.get('width', 1024),
                 'height': client_params.get('height', 1024),
                 'steps': client_params.get('steps', 20),
@@ -773,20 +775,22 @@ class Text2ImageStageProcessor(StageProcessor):
                 'sample_count': client_params.get('sample_count', 1),
             }
             client = create_ai_client(provider)
-            # 调用generate (同步函数)
-            response = client.generate(
-                api_url=api_url,
-                session_id=api_key,
-                model=model_name,
-                prompt=prompt,
-                image=prompt_payload['image'],
-                ratio=client_params.get('ratio', ratio),
-                resolution=client_params.get('resolution', resolution),
-                height=client_params.get('height', 1024),
-                width=client_params.get('width', 1024),
-                steps=client_params.get('steps', 20),
-                negative_prompt=client_params.get('negative_prompt', ''),
-                sample_count=client_params.get('sample_count', 1),
+            response = ImageGenerationService.generate(
+                provider=provider,
+                client=client,
+                request=Text2ImageRequest(
+                    prompt=prompt,
+                    negative_prompt=client_params.get('negative_prompt', ''),
+                    reference_images=prompt_payload['image'],
+                    aspect_ratio=client_params.get('ratio', ratio or '1:1'),
+                    width=client_params.get('width', 1024),
+                    height=client_params.get('height', 1024),
+                    sample_count=client_params.get('sample_count', 1),
+                    extra={
+                        'resolution': client_params.get('resolution', resolution or '2k'),
+                        'steps': client_params.get('steps', 20),
+                    },
+                ),
             )
 
             if not response:

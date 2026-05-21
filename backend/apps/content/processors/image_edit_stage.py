@@ -14,6 +14,8 @@ from apps.content.models import EditedImage, MultiGridTile, Storyboard
 from apps.projects.models import Project, ProjectStage
 from apps.prompts.client_param_resolver import resolve_stage_client_params
 from core.ai_client.factory import create_ai_client
+from core.ai_client.image_service import ImageGenerationService
+from core.ai_client.schemas import ImageEditRequest
 
 from .text2image_stage import Text2ImageStageProcessor
 
@@ -89,7 +91,7 @@ class ImageEditStageProcessor(Text2ImageStageProcessor):
         project_id: str,
         storyboard_ids: List[str] = None,
         force_regenerate: bool = False,
-        strength: float = 0.35,
+        strength: float = 0.5,
         width: int = None,
         height: int = None,
     ) -> Generator[Dict[str, Any], None, None]:
@@ -203,14 +205,18 @@ class ImageEditStageProcessor(Text2ImageStageProcessor):
                     'message': f'正在执行第 {index}/{total} 张图片编辑...',
                 }
 
-                response = client.generate(
-                    image_url=tile.tile_image_url,
-                    prompt=prompt,
-                    strength=client_params.get('strength', strength),
-                    width=output_width,
-                    height=output_height,
-                    mask_url=client_params.get('mask_url', ''),
-                    negative_prompt=client_params.get('negative_prompt', ''),
+                response = ImageGenerationService.edit(
+                    provider=provider,
+                    client=client,
+                    request=ImageEditRequest(
+                        source_images=[tile.tile_image_url],
+                        prompt=prompt,
+                        mask_image=client_params.get('mask_url', ''),
+                        negative_prompt=client_params.get('negative_prompt', ''),
+                        strength=client_params.get('strength', strength),
+                        width=output_width,
+                        height=output_height,
+                    ),
                 )
                 response_data = getattr(response, 'data', None) if not isinstance(response, dict) else response.get('data')
                 response_error = getattr(response, 'error', None) if not isinstance(response, dict) else response.get('error')

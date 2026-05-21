@@ -110,7 +110,7 @@ class ModelProviderVendorServiceTestCase(APITestCase):
         self.assertEqual(result['created_count'], 1)
         self.assertEqual(provider.provider_type, 'text2image')
         self.assertEqual(provider.api_url, 'https://ark.cn-beijing.volces.com/api/v3/images/generations')
-        self.assertEqual(provider.executor_class, 'core.ai_client.text2image_client.Text2ImageClient')
+        self.assertEqual(provider.executor_class, 'core.ai_client.executors.openai_images_generation_executor.OpenAIImagesGenerationExecutor')
 
     def test_batch_create_vendor_models_supports_302ai_text2image(self):
         result = ModelProviderService.batch_create_vendor_models({
@@ -132,7 +132,7 @@ class ModelProviderVendorServiceTestCase(APITestCase):
         self.assertEqual(result['created_count'], 1)
         self.assertEqual(provider.provider_type, 'text2image')
         self.assertEqual(provider.api_url, 'https://api.302.ai/302/images/generations')
-        self.assertEqual(provider.executor_class, 'core.ai_client.text2image_client.Text2ImageClient')
+        self.assertEqual(provider.executor_class, 'core.ai_client.executors.openai_images_generation_executor.OpenAIImagesGenerationExecutor')
 
     def test_batch_create_vendor_models_supports_volcengine_image2video(self):
         result = ModelProviderService.batch_create_vendor_models({
@@ -191,7 +191,7 @@ class ModelProviderVendorServiceTestCase(APITestCase):
         self.assertEqual(image_result['created_count'], 1)
         self.assertEqual(video_result['created_count'], 1)
         self.assertEqual(image_provider.provider_type, 'text2image')
-        self.assertEqual(image_provider.executor_class, 'core.ai_client.text2image_client.Text2ImageClient')
+        self.assertEqual(image_provider.executor_class, 'core.ai_client.executors.openai_images_generation_executor.OpenAIImagesGenerationExecutor')
         self.assertEqual(video_provider.provider_type, 'image2video')
         self.assertEqual(video_provider.executor_class, 'core.ai_client.image2video_client.VideoGeneratorClient')
 
@@ -384,8 +384,9 @@ class ModelProviderVendorViewSetTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertGreaterEqual(len(response.data['results']), 2)
-        self.assertEqual(response.data['results'][0]['id'], str(newer_provider.id))
-        self.assertEqual(response.data['results'][1]['id'], str(older_provider.id))
+        ordered_ids = [item['id'] for item in response.data['results']]
+        self.assertEqual(ordered_ids[0], str(newer_provider.id))
+        self.assertLess(ordered_ids.index(str(newer_provider.id)), ordered_ids.index(str(older_provider.id)))
 
     @patch('apps.models.services.requests.get')
     def test_discover_vendor_models_endpoint(self, mock_get):

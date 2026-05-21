@@ -23,7 +23,8 @@ from rest_framework.response import Response
 from django.http import StreamingHttpResponse
 
 from apps.models.models import ModelProvider
-from core.ai_client.factory import create_ai_client
+from core.ai_client.image_service import ImageGenerationService
+from core.ai_client.schemas import Text2ImageRequest
 from core.utils.file_storage import image_storage
 from .models import (
     PromptTemplate,
@@ -654,16 +655,17 @@ class GlobalVariableViewSet(viewsets.ModelViewSet):
         ratio = request.data.get('ratio') or extra_config.get('ratio') or '1:1'
         resolution = request.data.get('resolution') or extra_config.get('resolution') or '2k'
 
-        client = create_ai_client(provider)
-        response = client.generate(
-            api_url=provider.api_url,
-            session_id=provider.api_key,
-            model=provider.model_name,
-            prompt=prompt,
-            ratio=ratio,
-            resolution=resolution,
-            width=width,
-            height=height,
+        response = ImageGenerationService.generate(
+            provider=provider,
+            request=Text2ImageRequest(
+                prompt=prompt,
+                width=width,
+                height=height,
+                aspect_ratio=ratio,
+                extra={
+                    'resolution': resolution,
+                },
+            ),
         )
 
         images = response.data if hasattr(response, 'data') else None

@@ -15,7 +15,7 @@ class AIResponse:
 
     success: bool
     text: str = ""
-    data: Dict[str, Any] = None
+    data: Any = None
     metadata: Dict[str, Any] = None
     error: Optional[str] = None
 

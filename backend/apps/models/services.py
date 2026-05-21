@@ -16,6 +16,8 @@ from .models import ModelProvider, ModelUsageLog, VendorConnectionConfig
 from .opencode_config import OpencodeConfigSyncService
 from .vendor_catalog import VENDOR_CATALOG
 from urllib.parse import urlparse
+from core.ai_client.image_service import ImageGenerationService
+from core.ai_client.schemas import ImageEditRequest, Text2ImageRequest
 
 
 CAPABILITY_LABELS = {
@@ -188,20 +190,20 @@ class ModelProviderService:
             normalized_api_url = api_url_override.rstrip('/')
             capability_config['api_url'] = normalized_api_url
             path = urlparse(normalized_api_url).path.rstrip('/')
-            if path.endswith('/chat/completions'):
-                capability_config['models_endpoint'] = normalized_api_url[: -len('/chat/completions')] + '/models'
-            elif path.endswith('/images/generations'):
-                capability_config['models_endpoint'] = normalized_api_url[: -len('/images/generations')] + '/models'
-            elif path.endswith('/images/edits'):
-                capability_config['models_endpoint'] = normalized_api_url[: -len('/images/edits')] + '/models'
-            elif path.endswith('/videos/generations'):
-                capability_config['models_endpoint'] = normalized_api_url[: -len('/videos/generations')] + '/models'
-            elif path.endswith('/video/generations'):
-                capability_config['models_endpoint'] = normalized_api_url[: -len('/video/generations')] + '/models'
-            elif path.endswith('/contents/generations/tasks'):
-                capability_config['models_endpoint'] = normalized_api_url[: -len('/contents/generations/tasks')] + '/models'
-            else:
-                capability_config['models_endpoint'] = normalized_api_url.rstrip('/') + '/models'
+            # if path.endswith('/chat/completions'):
+            #     capability_config['models_endpoint'] = normalized_api_url[: -len('/chat/completions')] + '/models'
+            # elif path.endswith('/images/generations'):
+            #     capability_config['models_endpoint'] = normalized_api_url[: -len('/images/generations')] + '/models'
+            # elif path.endswith('/images/edits'):
+            #     capability_config['models_endpoint'] = normalized_api_url[: -len('/images/edits')] + '/models'
+            # elif path.endswith('/videos/generations'):
+            #     capability_config['models_endpoint'] = normalized_api_url[: -len('/videos/generations')] + '/models'
+            # elif path.endswith('/video/generations'):
+            #     capability_config['models_endpoint'] = normalized_api_url[: -len('/video/generations')] + '/models'
+            # elif path.endswith('/contents/generations/tasks'):
+            #     capability_config['models_endpoint'] = normalized_api_url[: -len('/contents/generations/tasks')] + '/models'
+            # else:
+            #     capability_config['models_endpoint'] = normalized_api_url.rstrip('/') + '/models'
 
         return capability_config
 
@@ -812,14 +814,20 @@ class ModelProviderService:
         resolution = extra_config.get('default_resolution') or extra_config.get('resolution', '2k')
 
         client = await sync_to_async(create_ai_client)(provider)
-        ai_response = await sync_to_async(client.generate)(
-            prompt=prompt,
-            negative_prompt=negative_prompt,
-            width=width,
-            height=height,
-            steps=steps,
-            ratio=ratio,
-            resolution=resolution,
+        ai_response = await sync_to_async(ImageGenerationService.generate)(
+            provider,
+            Text2ImageRequest(
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                width=width,
+                height=height,
+                aspect_ratio=ratio,
+                extra={
+                    'steps': steps,
+                    'resolution': resolution,
+                },
+            ),
+            client,
         )
 
         return {
@@ -989,7 +997,7 @@ class ModelProviderService:
                 'provider': provider.name,
                 'videos': data,
                 'metadata': metadata,
-                'test_image_url': image_url,
+                'test_image_url': image_url or '',
                 'test_image_base64_provided': bool(test_image_base64),
                 'test_image_mime_type': test_image_mime_type or 'image/jpeg',
                 'used_default_test_image': used_default_test_image,
@@ -1020,13 +1028,17 @@ class ModelProviderService:
         mask_url = extra_config.get('mask_url', '')
 
         client = await sync_to_async(create_ai_client)(provider)
-        ai_response = await sync_to_async(client.generate)(
-            image_url=image_url,
-            prompt=prompt,
-            mask_url=mask_url,
-            strength=strength,
-            width=width,
-            height=height,
+        ai_response = await sync_to_async(ImageGenerationService.edit)(
+            provider,
+            ImageEditRequest(
+                source_images=[image_url],
+                prompt=prompt,
+                mask_image=mask_url,
+                strength=strength,
+                width=width,
+                height=height,
+            ),
+            client,
         )
 
         return {

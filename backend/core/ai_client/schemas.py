@@ -1,0 +1,66 @@
+"""统一的图片能力请求与响应 schema。"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+
+@dataclass
+class GeneratedImageItem:
+    """统一的图片结果项。"""
+
+    url: str = ""
+    width: Optional[int] = None
+    height: Optional[int] = None
+    b64_json: str = ""
+    original_url: str = ""
+    storage_path: str = ""
+    source_image_url: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class Text2ImageRequest:
+    """统一的文生图请求。"""
+
+    prompt: str
+    negative_prompt: str = ""
+    reference_images: List[str] = field(default_factory=list)
+    width: Optional[int] = None
+    height: Optional[int] = None
+    aspect_ratio: str = ""
+    sample_count: int = 1
+    seed: Optional[int] = None
+    extra: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def size(self) -> str:
+        if self.width and self.height:
+            return f"{self.width}x{self.height}"
+        return ""
+
+
+@dataclass
+class ImageEditRequest:
+    """统一的图片编辑请求。"""
+
+    source_images: List[str]
+    prompt: str
+    mask_image: str = ""
+    negative_prompt: str = ""
+    strength: float = 0.35
+    width: Optional[int] = None
+    height: Optional[int] = None
+    edit_mode: str = "img2img"
+    extra: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def primary_source_image(self) -> str:
+        return self.source_images[0] if self.source_images else ""
+
+    @property
+    def size(self) -> str:
+        if self.width and self.height:
+            return f"{self.width}x{self.height}"
+        return ""

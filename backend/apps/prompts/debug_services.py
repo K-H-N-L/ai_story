@@ -22,6 +22,8 @@ from jinja2 import Template, TemplateError
 from apps.models.models import ModelProvider
 from apps.projects.utils import parse_json, parse_storyboard_json
 from core.ai_client.factory import create_ai_client
+from core.ai_client.image_service import ImageGenerationService
+from core.ai_client.schemas import ImageEditRequest, Text2ImageRequest
 
 from .models import (
     GlobalVariable,
@@ -394,17 +396,25 @@ class PromptDebugService:
             provider=provider,
             runtime_overrides=input_payload,
         )
-        response = client.generate(
-            prompt=rendered_prompt,
-            image=input_images or [],
-            negative_prompt=client_params.get('negative_prompt', ''),
-            width=client_params.get('width', 1024),
-            height=client_params.get('height', 1024),
-            steps=client_params.get('steps', 20),
-            ratio=client_params.get('ratio', '1:1'),
-            resolution=client_params.get('resolution', '2k'),
-            sample_count=client_params.get('sample_count', 1),
+        response = ImageGenerationService.generate(
+            provider=provider,
+            client=client,
+            request=Text2ImageRequest(
+                prompt=rendered_prompt,
+                negative_prompt=client_params.get('negative_prompt', ''),
+                reference_images=input_images or [],
+                width=client_params.get('width', 1024),
+                height=client_params.get('height', 1024),
+                aspect_ratio=client_params.get('ratio', '1:1'),
+                sample_count=client_params.get('sample_count', 1),
+                extra={
+                    'steps': client_params.get('steps', 20),
+                    'resolution': client_params.get('resolution', '2k'),
+                },
+            ),
         )
+        if inspect.isawaitable(response):
+            response = asyncio.run(response)
         latency_ms = int((time.time() - start_time) * 1000)
         if not response.success:
             raise ValueError(response.error or '文生图调试执行失败')
@@ -441,14 +451,18 @@ class PromptDebugService:
             runtime_overrides=input_payload,
         )
 
-        response = client.generate(
-            image_url=image_url,
-            prompt=rendered_prompt,
-            mask_url=client_params.get('mask_url', ''),
-            strength=client_params.get('strength', 0.35),
-            width=client_params.get('width', 1024),
-            height=client_params.get('height', 1024),
-            negative_prompt=client_params.get('negative_prompt', ''),
+        response = ImageGenerationService.edit(
+            provider=provider,
+            client=client,
+            request=ImageEditRequest(
+                source_images=[image_url],
+                prompt=rendered_prompt,
+                mask_image=client_params.get('mask_url', ''),
+                negative_prompt=client_params.get('negative_prompt', ''),
+                strength=client_params.get('strength', 0.35),
+                width=client_params.get('width', 1024),
+                height=client_params.get('height', 1024),
+            ),
         )
         if inspect.isawaitable(response):
             response = asyncio.run(response)
