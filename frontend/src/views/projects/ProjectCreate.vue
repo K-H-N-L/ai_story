@@ -77,6 +77,56 @@
               </select>
             </div>
             <div class="form-control">
+              <label class="field-label">关联剧本（可选）</label>
+              <select
+                v-model="form.screenplay"
+                class="field-input"
+                :disabled="loadingScreenplays"
+                @change="handleScreenplayChange"
+              >
+                <option :value="null">
+                  {{ loadingScreenplays ? '加载中...' : '不关联剧本' }}
+                </option>
+                <option
+                  v-for="item in screenplays"
+                  :key="item.id"
+                  :value="item.id"
+                >
+                  {{ item.title }}（{{ item.episodes_count || 0 }}集）
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div
+            v-if="form.screenplay && screenplayEpisodes.length > 0"
+            class="card-meta screenplay-import-section"
+          >
+            <div class="screenplay-episodes-header">
+              <span class="field-label">剧本分集（{{ screenplayEpisodes.length }}集）</span>
+              <button
+                type="button"
+                class="import-btn"
+                @click="importFromScreenplay"
+              >
+                导入到批量列表
+              </button>
+            </div>
+            <div class="screenplay-episodes-list">
+              <div
+                v-for="ep in screenplayEpisodes"
+                :key="ep.id"
+                class="screenplay-episode-item"
+              >
+                <span class="episode-num">第{{ ep.episode_number }}集</span>
+                <span class="episode-title">{{ ep.episode_title || '未命名' }}</span>
+                <span class="episode-chars">{{ ep.content_word_count || 0 }}字</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-meta form-grid two-columns">
+            <div class="form-control">
               <label class="field-label">提示词集 <span class="required-mark">*</span></label>
               <select
                 v-model="form.prompt_template_set"
@@ -358,6 +408,7 @@
 <script>
 import { mapActions, mapState } from 'vuex';
 import { promptSetAPI } from '@/api/prompts';
+import screenplayApi from '@/api/screenplays';
 
 const DEFAULT_EPISODE_NAME_REGEX = /^第\d+集$/;
 
@@ -376,6 +427,7 @@ export default {
       form: {
         mode: 'single',
         series: null,
+        screenplay: null,
         episode_number: 1,
         episode_title: '',
         name: '',
@@ -393,7 +445,10 @@ export default {
         batch_episode_errors: {},
       },
       templateSets: [],
+      screenplays: [],
+      screenplayEpisodes: [],
       loadingTemplates: false,
+      loadingScreenplays: false,
       submitting: false,
       submitTried: false,
       singleTitleTouched: false,
@@ -437,6 +492,7 @@ export default {
       this.form.series = this.$route.query.series_id;
     }
     await this.fetchTemplateSets();
+    await this.fetchScreenplays();
     await this.applySeriesDefaults();
   },
   methods: {
@@ -449,6 +505,53 @@ export default {
       } finally {
         this.loadingTemplates = false;
       }
+    },
+    async fetchScreenplays() {
+      this.loadingScreenplays = true;
+      try {
+        const response = await screenplayApi.getScreenplays({ page_size: 100 });
+        this.screenplays = response.results || response || [];
+      } catch (error) {
+        console.error('Failed to fetch screenplays:', error);
+      } finally {
+        this.loadingScreenplays = false;
+      }
+    },
+    async handleScreenplayChange() {
+      if (!this.form.screenplay) {
+        this.screenplayEpisodes = [];
+        return;
+      }
+      try {
+        const detail = await screenplayApi.getScreenplayDetail(this.form.screenplay);
+        this.screenplayEpisodes = detail.episodes || [];
+      } catch (error) {
+        console.error('Failed to fetch screenplay episodes:', error);
+        this.screenplayEpisodes = [];
+      }
+    },
+    importFromScreenplay() {
+      if (!this.screenplayEpisodes.length) return;
+
+      // 切换到批量模式
+      this.form.mode = 'batch';
+
+      // 将剧本分集转换为批量分集格式
+      this.form.batch_episodes = this.screenplayEpisodes.map((ep) => ({
+        key: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        episode_title: ep.episode_title || '',
+        name: '',
+        original_topic: ep.content || '',
+        titleTouched: !!ep.episode_title,
+      }));
+
+      // 设置起始序号
+      if (this.screenplayEpisodes.length > 0) {
+        const firstEp = this.screenplayEpisodes[0];
+        this.form.start_episode_number = firstEp.episode_number || 1;
+      }
+
+      this.$message.success(`已导入 ${this.screenplayEpisodes.length} 集`);
     },
     getLatestEpisode(episodes = []) {
       if (!episodes.length) {
@@ -641,6 +744,7 @@ export default {
         if (this.form.mode === 'batch') {
           const response = await this.batchCreateProjects({
             series: this.form.series,
+            screenplay: this.form.screenplay,
             description: this.form.description.trim(),
             prompt_template_set: this.form.prompt_template_set,
             start_episode_number: this.form.start_episode_number,
@@ -657,6 +761,7 @@ export default {
 
         const project = await this.createProject({
           series: this.form.series,
+          screenplay: this.form.screenplay,
           episode_number: this.form.episode_number,
           episode_title: this.form.episode_title.trim(),
           name: this.form.name.trim(),
@@ -1008,5 +1113,102 @@ export default {
   .mode-option {
     width: 100%;
   }
+}
+
+/* Screenplay import styles */
+.screenplay-import-section {
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.screenplay-episodes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.import-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: rgba(20, 184, 166, 0.16);
+  color: #0f172a;
+  border: 1px solid rgba(20, 184, 166, 0.4);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.layout-shell.theme-dark .import-btn {
+  background: rgba(94, 234, 212, 0.2);
+  color: #e2e8f0;
+  border-color: rgba(94, 234, 212, 0.5);
+}
+
+.import-btn:hover {
+  background: rgba(20, 184, 166, 0.25);
+  border-color: rgba(20, 184, 166, 0.6);
+}
+
+.screenplay-episodes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  background: rgba(148, 163, 184, 0.08);
+  border-radius: 12px;
+}
+
+.layout-shell.theme-dark .screenplay-episodes-list {
+  background: rgba(30, 41, 59, 0.4);
+}
+
+.screenplay-episode-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.layout-shell.theme-dark .screenplay-episode-item {
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.episode-num {
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(20, 184, 166, 0.16);
+  color: #0f172a;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.layout-shell.theme-dark .episode-num {
+  background: rgba(94, 234, 212, 0.2);
+  color: #e2e8f0;
+}
+
+.episode-title {
+  flex: 1;
+  color: #334155;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layout-shell.theme-dark .episode-title {
+  color: #cbd5e1;
+}
+
+.episode-chars {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
 </style>

@@ -6,6 +6,7 @@ import projects from './modules/projects';
 import prompts from './modules/prompts';
 import models from './modules/models';
 import content from './modules/content';
+import screenplays from './modules/screenplays';
 import ui from './modules/ui';
 import assistant from './modules/assistant';
 
@@ -38,6 +39,7 @@ export default new Vuex.Store({
     prompts,
     models,
     content,
+    screenplays,
     ui,
     assistant,
   },

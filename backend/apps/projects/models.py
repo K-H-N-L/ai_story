@@ -70,6 +70,14 @@ class Project(models.Model):
         null=True,
         blank=True
     )
+    screenplay = models.ForeignKey(
+        'scripts.Screenplay',
+        on_delete=models.SET_NULL,
+        related_name='projects',
+        verbose_name='关联剧本',
+        null=True,
+        blank=True
+    )
     episode_number = models.IntegerField('分集序号', null=True, blank=True)
     episode_title = models.CharField('分集标题', max_length=255, blank=True, default='')
     sort_order = models.IntegerField('排序值', default=0)

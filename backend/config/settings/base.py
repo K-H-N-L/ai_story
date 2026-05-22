@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'apps.agent',
     'apps.mcp',
     'apps.ai_proxy',
+    'apps.scripts',
 ]
 
 MIDDLEWARE = [

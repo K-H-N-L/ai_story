@@ -78,6 +78,25 @@ const routes = [
     ],
   },
   {
+    path: '/screenplays',
+    component: () => import('@/views/Layout.vue'),
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'ScreenplayList',
+        component: () => import('@/views/screenplays/ScreenplayList.vue'),
+        meta: { title: '剧本管理' },
+      },
+      {
+        path: ':id',
+        name: 'ScreenplayDetail',
+        component: () => import('@/views/screenplays/ScreenplayDetail.vue'),
+        meta: { title: '剧本详情' },
+      },
+    ],
+  },
+  {
     path: '/prompts',
     component: () => import('@/views/Layout.vue'),
     meta: { requiresAuth: true },
