@@ -61,3 +61,4 @@ backend/apps/mcp/**
 !backend/apps/mcp/**/*.so
 !backend/apps/agent/.gitkeep
 !backend/apps/mcp/.gitkeep
+backend/apps/workflows/**

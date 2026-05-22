@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'apps.mcp',
     'apps.ai_proxy',
     'apps.scripts',
+    'apps.workflows',
 ]
 
 MIDDLEWARE = [
