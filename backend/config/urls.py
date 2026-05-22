@@ -17,9 +17,11 @@ urlpatterns = [
     path('api/v1/content/', include('apps.content.urls')),
     path('api/v1/users/', include('apps.users.urls')),
     path('api/v1/agent/', include('apps.agent.urls')),
+    path('api/v1/ai/', include('apps.ai_proxy.urls')),
     path('api/mock/', include('apps.mock_api.urls')),
 ]
 
-# 开发环境下提供媒体文件访问
+# 开发环境下提供媒体文件和 storage 文件访问
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STORAGE_URL, document_root=settings.STORAGE_ROOT)

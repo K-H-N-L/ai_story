@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'apps.mock_api',
     'apps.agent',
     'apps.mcp',
+    'apps.ai_proxy',
 ]
 
 MIDDLEWARE = [
@@ -146,7 +147,12 @@ REDIS_PUBSUB_URL = os.getenv('REDIS_PUBSUB_URL', f'redis://{REDIS_HOST}:{REDIS_P
 
 # CORS配置
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = ["http://127.0.0.1:3000"]
+CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:3000",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 
 AGENT_SERVER_BASE_URL = os.getenv('AGENT_SERVER_BASE_URL', 'http://127.0.0.1:9002').strip()
 AGENT_SERVER_USERNAME = os.getenv('AGENT_SERVER_USERNAME', 'opencode').strip()
