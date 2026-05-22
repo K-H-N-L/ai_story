@@ -94,6 +94,12 @@ const routes = [
         component: () => import('@/views/screenplays/ScreenplayDetail.vue'),
         meta: { title: '剧本详情' },
       },
+      {
+        path: ':screenplayId/episodes/:episodeId',
+        name: 'EpisodeDetail',
+        component: () => import('@/views/screenplays/EpisodeDetail.vue'),
+        meta: { title: '分集详情' },
+      },
     ],
   },
   {

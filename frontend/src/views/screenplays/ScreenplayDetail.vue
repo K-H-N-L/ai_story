@@ -102,6 +102,7 @@
             v-for="episode in episodes"
             :key="episode.id"
             class="episode-card"
+            @click="goToEpisode(episode)"
           >
             <div class="card-top">
               <div>
@@ -131,13 +132,13 @@
               <div class="episode-actions">
                 <button
                   class="episode-action-btn"
-                  @click="handleEditEpisode(episode)"
+                  @click.stop="goToEpisode(episode)"
                 >
                   编辑
                 </button>
                 <button
                   class="episode-action-btn episode-action-btn--danger"
-                  @click="handleDeleteEpisode(episode)"
+                  @click.stop="handleDeleteEpisode(episode)"
                 >
                   删除
                 </button>
@@ -148,7 +149,7 @@
       </template>
     </LoadingContainer>
 
-    <!-- 添加/编辑分集弹窗 -->
+    <!-- 添加分集弹窗 -->
     <div
       v-if="showEpisodeDialog"
       class="modal-overlay"
@@ -156,7 +157,7 @@
     >
       <div class="modal-card modal-card--wide">
         <h3 class="modal-title">
-          {{ editingEpisode ? '编辑分集' : '添加分集' }}
+          添加分集
         </h3>
         <form @submit.prevent="handleEpisodeSubmit">
           <div class="form-row">
@@ -232,7 +233,6 @@ export default {
       loading: false,
       submitting: false,
       showEpisodeDialog: false,
-      editingEpisode: null,
       episodeForm: {
         episode_number: 1,
         episode_title: '',
@@ -255,7 +255,6 @@ export default {
       'fetchScreenplayDetail',
       'clearCurrentScreenplay',
       'createEpisode',
-      'updateEpisode',
       'deleteEpisode',
     ]),
     formatDate,
@@ -271,15 +270,14 @@ export default {
       if (!content) return '暂无内容';
       return content.length > 100 ? content.substring(0, 100) + '...' : content;
     },
-    handleEditEpisode(episode) {
-      this.editingEpisode = episode;
-      this.episodeForm = {
-        episode_number: episode.episode_number,
-        episode_title: episode.episode_title || '',
-        content: episode.content || '',
-        sort_order: episode.sort_order || 0,
-      };
-      this.showEpisodeDialog = true;
+    goToEpisode(episode) {
+      this.$router.push({
+        name: 'EpisodeDetail',
+        params: {
+          screenplayId: this.screenplayId,
+          episodeId: episode.id,
+        },
+      });
     },
     async handleDeleteEpisode(episode) {
       const confirmed = await this.$confirm(
@@ -300,30 +298,21 @@ export default {
     async handleEpisodeSubmit() {
       this.submitting = true;
       try {
-        if (this.editingEpisode) {
-          await this.updateEpisode({
-            id: this.editingEpisode.id,
-            data: this.episodeForm,
-          });
-          this.$message.success('分集已更新');
-        } else {
-          await this.createEpisode({
-            ...this.episodeForm,
-            screenplay: this.screenplayId,
-          });
-          this.$message.success('分集已添加');
-        }
+        await this.createEpisode({
+          ...this.episodeForm,
+          screenplay: this.screenplayId,
+        });
+        this.$message.success('分集已添加');
         this.closeEpisodeDialog();
       } catch (error) {
         console.error('Failed to save episode:', error);
-        this.$message.error('保存分集失败');
+        this.$message.error('添加分集失败');
       } finally {
         this.submitting = false;
       }
     },
     closeEpisodeDialog() {
       this.showEpisodeDialog = false;
-      this.editingEpisode = null;
       this.episodeForm = {
         episode_number: (this.episodes?.length || 0) + 1,
         episode_title: '',
@@ -481,6 +470,7 @@ export default {
   flex-direction: column;
   gap: 1.25rem;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
 }
 
 .layout-shell.theme-dark .episode-card {

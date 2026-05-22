@@ -32,6 +32,10 @@ export default {
     });
   },
 
+  getEpisodeDetail(id) {
+    return apiClient.get(`/scripts/episodes/${id}/`);
+  },
+
   createEpisode(data) {
     return apiClient.post('/scripts/episodes/', data);
   },
