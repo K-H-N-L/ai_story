@@ -168,6 +168,10 @@ export default {
           await this.$refs.projectCanvas?.handleResumePipeline();
           return '已触发恢复流程。';
         },
+        refresh_canvas: async () => {
+          await this.refreshCanvasData();
+          return '画布已刷新，数据已更新。';
+        },
       });
     },
 

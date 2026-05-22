@@ -80,6 +80,7 @@ export const buildProjectDetailAgentContext = ({ route, project, stages = [], se
       'run_pipeline',
       'pause_pipeline',
       'resume_pipeline',
+      'refresh_canvas',
     ],
     stats: {
       totalStages: stages.length,
