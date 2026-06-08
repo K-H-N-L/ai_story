@@ -110,7 +110,9 @@ docker-compose exec backend python backend/manage.py createsuperuser
 
 
 **导演模式** - 正在开发中，支持更精细的分镜和视频控制
-![导演模式界面](image2.png)
+![导演模式界面](image14.png)
+![导演模式界面](image15.png)
+![导演模式界面](image16.png)
 
 **成品视频效果** - 视频号搜索：小小方圆669
 
