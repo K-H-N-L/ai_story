@@ -19,7 +19,6 @@ urlpatterns = [
     path('api/v1/agent/', include('apps.agent.urls')),
     path('api/v1/ai/', include('apps.ai_proxy.urls')),
     path('api/v1/scripts/', include('apps.scripts.urls')),
-    path('api/v1/workflows/', include('apps.workflows.urls')),
     path('api/mock/', include('apps.mock_api.urls')),
 ]
 
