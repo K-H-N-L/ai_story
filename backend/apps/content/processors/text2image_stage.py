@@ -194,9 +194,10 @@ class Text2ImageStageProcessor(StageProcessor):
                     'skipped_count': skipped_count,
                 }
 
+                success_rate = completed_storyboards / total_storyboards if total_storyboards > 0 else 0
                 stage.output_data = output_data
-                stage.status = 'completed' if failed_count == 0 else 'failed'
-                stage.error_message = '' if failed_count == 0 else '仍有分镜图片未生成完成'
+                stage.status = 'completed' if success_rate >= 0.5 else 'failed'
+                stage.error_message = '' if failed_count == 0 else f'图片生成完成: 已完成 {completed_storyboards}/{total_storyboards}'
                 stage.completed_at = timezone.now()
                 stage.save()
 
@@ -300,9 +301,10 @@ class Text2ImageStageProcessor(StageProcessor):
                 'skipped_count': skipped_count,
             }
 
+            success_rate = completed_storyboards / total_storyboards if total_storyboards > 0 else 0
             stage.output_data = output_data
-            stage.status = 'completed' if project_failed_count == 0 else 'failed'
-            stage.error_message = '' if project_failed_count == 0 else '仍有分镜图片未生成完成'
+            stage.status = 'completed' if success_rate >= 0.5 else 'failed'
+            stage.error_message = '' if project_failed_count == 0 else f'图片生成完成: 已完成 {completed_storyboards}/{total_storyboards}'
             stage.completed_at = timezone.now()
             stage.save()
 

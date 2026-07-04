@@ -99,17 +99,19 @@ def is_stage_template_enabled(project, stage_type: str) -> bool:
 
 def _extract_json_from_text(text: str) -> str:
         """从文本中提取JSON内容,处理可能包含markdown代码块的情况"""
-        # 尝试移除 markdown 代码块标记
         text = text.strip()
 
-        # 如果有 ```json 或 ``` 标记,提取其中的内容
         if '```' in text:
-            # 匹配 ```json ... ``` 或 ``` ... ```
             match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', text, re.DOTALL)
             if match:
                 text = match.group(1).strip()
 
-        return text.replace("\n", "")
+        first_brace = text.find('{')
+        last_brace = text.rfind('}')
+        if first_brace != -1 and last_brace != -1 and first_brace < last_brace:
+            text = text[first_brace:last_brace + 1]
+
+        return text
 
 def parse_storyboard_json(json_text: str) -> dict:
     """解析分镜JSON数据"""
@@ -127,12 +129,18 @@ def parse_storyboard_json(json_text: str) -> dict:
         if not isinstance(storyboard_data['scenes'], list):
             raise ValueError("'scenes' 必须是数组类型")
 
-        # 验证每个场景的必需字段
+        # 验证并补全每个场景的必需字段
         for i, scene in enumerate(storyboard_data['scenes']):
-            required_fields = ['scene_number', 'narration', 'visual_prompt', 'shot_type']
-            for field in required_fields:
-                if field not in scene:
-                    raise ValueError(f"场景 {i+1} 缺少必需字段: {field}")
+            if not isinstance(scene, dict):
+                continue
+            if 'scene_number' not in scene:
+                scene['scene_number'] = i + 1
+            if 'shot_type' not in scene:
+                scene['shot_type'] = scene.get('camera_angle', scene.get('shot', 'medium'))
+            if 'visual_prompt' not in scene:
+                scene['visual_prompt'] = scene.get('description', scene.get('prompt', ''))
+            if 'narration' not in scene:
+                scene['narration'] = scene.get('dialogue', scene.get('text', ''))
 
         return storyboard_data
 

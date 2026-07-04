@@ -1,21 +1,96 @@
 """项目应用信号"""
 
+import os
 import uuid
 from pathlib import Path
 
 from django.apps import apps
 from django.db import connection, transaction
 from django.db.models.signals import post_migrate
+from django.conf import settings
 from jinja2 import Environment, meta
 
 
 DEFAULT_PROMPT_DIR = Path(__file__).resolve().parent / 'default_promot'
 
 
-def create_mock_providers():
-    """创建 Mock API 提供商配置。"""
+def create_providers():
+    """根据环境变量创建模型提供商配置。
+    
+    如果设置了环境变量，则创建真实提供商；否则创建 Mock 提供商。
+    
+    支持的环境变量:
+    - LLM_API_URL: LLM API 地址
+    - LLM_API_KEY: LLM API 密钥
+    - LLM_MODEL_NAME: LLM 模型名称
+    - TEXT2IMAGE_API_URL: 文生图 API 地址
+    - TEXT2IMAGE_API_KEY: 文生图 API 密钥
+    - TEXT2IMAGE_MODEL_NAME: 文生图模型名称
+    - IMAGE2VIDEO_API_URL: 图生视频 API 地址
+    - IMAGE2VIDEO_API_KEY: 图生视频 API 密钥
+    - IMAGE2VIDEO_MODEL_NAME: 图生视频模型名称
+    """
     ModelProvider = apps.get_model('models', 'ModelProvider')
 
+    llm_api_url = getattr(settings, 'LLM_API_URL', '')
+    llm_api_key = getattr(settings, 'LLM_API_KEY', '')
+    llm_model_name = getattr(settings, 'LLM_MODEL_NAME', '')
+    
+    text2image_api_url = getattr(settings, 'TEXT2IMAGE_API_URL', '')
+    text2image_api_key = getattr(settings, 'TEXT2IMAGE_API_KEY', '')
+    text2image_model_name = getattr(settings, 'TEXT2IMAGE_MODEL_NAME', '')
+    
+    image2video_api_url = getattr(settings, 'IMAGE2VIDEO_API_URL', '')
+    image2video_api_key = getattr(settings, 'IMAGE2VIDEO_API_KEY', '')
+    image2video_model_name = getattr(settings, 'IMAGE2VIDEO_MODEL_NAME', '')
+
+    if llm_api_url and llm_api_key and llm_model_name:
+        create_real_llm_provider(ModelProvider, llm_api_url, llm_api_key, llm_model_name)
+    else:
+        create_mock_llm_provider(ModelProvider)
+
+    if text2image_api_url and text2image_api_key and text2image_model_name:
+        create_real_text2image_provider(ModelProvider, text2image_api_url, text2image_api_key, text2image_model_name)
+    else:
+        create_mock_text2image_provider(ModelProvider)
+
+    if image2video_api_url and image2video_api_key and image2video_model_name:
+        create_real_image2video_provider(ModelProvider, image2video_api_url, image2video_api_key, image2video_model_name)
+    else:
+        create_mock_image2video_provider(ModelProvider)
+
+
+def create_real_llm_provider(ModelProvider, api_url, api_key, model_name):
+    """创建真实 LLM 提供商。"""
+    llm, created = ModelProvider.objects.get_or_create(
+        name='Production LLM API',
+        defaults={
+            'id': uuid.uuid4(),
+            'provider_type': 'llm',
+            'executor_class': 'core.ai_client.openai_client.OpenAIClient',
+            'api_url': api_url,
+            'api_key': api_key,
+            'model_name': model_name,
+            'max_tokens': 4096,
+            'temperature': 0.7,
+            'top_p': 1.0,
+            'timeout': 60,
+            'is_active': True,
+            'priority': 1,
+            'rate_limit_rpm': 60,
+            'rate_limit_rpd': 1000,
+            'extra_config': {
+                'description': '真实 LLM API，用于生产环境文案改写、分镜生成、运镜生成',
+                'is_mock': False,
+            }
+        }
+    )
+    if created:
+        print(f"✓ 已创建真实 LLM 提供商: {llm.name}")
+
+
+def create_mock_llm_provider(ModelProvider):
+    """创建 Mock LLM 提供商。"""
     mock_llm, created = ModelProvider.objects.get_or_create(
         name='Mock LLM API',
         defaults={
@@ -42,6 +117,35 @@ def create_mock_providers():
     if created:
         print(f"✓ 已创建 Mock LLM 提供商: {mock_llm.name}")
 
+
+def create_real_text2image_provider(ModelProvider, api_url, api_key, model_name):
+    """创建真实文生图提供商。"""
+    text2image, created = ModelProvider.objects.get_or_create(
+        name='Production Text2Image API',
+        defaults={
+            'id': uuid.uuid4(),
+            'provider_type': 'text2image',
+            'executor_class': 'core.ai_client.executors.openai_images_generation_executor.OpenAIImagesGenerationExecutor',
+            'api_url': api_url,
+            'api_key': api_key,
+            'model_name': model_name,
+            'timeout': 120,
+            'is_active': True,
+            'priority': 1,
+            'rate_limit_rpm': 30,
+            'rate_limit_rpd': 500,
+            'extra_config': {
+                'description': '真实文生图 API，用于生产环境图片生成',
+                'is_mock': False,
+            }
+        }
+    )
+    if created:
+        print(f"✓ 已创建真实文生图提供商: {text2image.name}")
+
+
+def create_mock_text2image_provider(ModelProvider):
+    """创建 Mock 文生图提供商。"""
     mock_text2image, created = ModelProvider.objects.get_or_create(
         name='Mock Text2Image API',
         defaults={
@@ -67,6 +171,35 @@ def create_mock_providers():
     if created:
         print(f"✓ 已创建 Mock 文生图提供商: {mock_text2image.name}")
 
+
+def create_real_image2video_provider(ModelProvider, api_url, api_key, model_name):
+    """创建真实图生视频提供商。"""
+    image2video, created = ModelProvider.objects.get_or_create(
+        name='Production Image2Video API',
+        defaults={
+            'id': uuid.uuid4(),
+            'provider_type': 'image2video',
+            'executor_class': 'core.ai_client.image2video_client.VideoGeneratorClient',
+            'api_url': api_url,
+            'api_key': api_key,
+            'model_name': model_name,
+            'timeout': 180,
+            'is_active': True,
+            'priority': 1,
+            'rate_limit_rpm': 10,
+            'rate_limit_rpd': 100,
+            'extra_config': {
+                'description': '真实图生视频 API，用于生产环境视频生成',
+                'is_mock': False,
+            }
+        }
+    )
+    if created:
+        print(f"✓ 已创建真实图生视频提供商: {image2video.name}")
+
+
+def create_mock_image2video_provider(ModelProvider):
+    """创建 Mock 图生视频提供商。"""
     mock_image2video, created = ModelProvider.objects.get_or_create(
         name='Mock Image2Video API',
         defaults={
@@ -110,6 +243,8 @@ def _ensure_default_prompt_template_set():
     )
 
     stage_types = [
+        'rewrite',
+        'asset_extraction',
         'storyboard',
         'image_generation',
         'camera_movement',
@@ -124,12 +259,22 @@ def _ensure_default_prompt_template_set():
         for stage_type in stage_types
     }
     stage_to_provider_name = {
+        'rewrite': 'Production LLM API',
+        'asset_extraction': 'Production LLM API',
+        'storyboard': 'Production LLM API',
+        'image_generation': 'Production Text2Image API',
+        'camera_movement': 'Production LLM API',
+        'video_generation': 'Production Image2Video API',
+    }
+    fallback_provider_name = {
+        'rewrite': 'Mock LLM API',
+        'asset_extraction': 'Mock LLM API',
         'storyboard': 'Mock LLM API',
         'image_generation': 'Mock Text2Image API',
         'camera_movement': 'Mock LLM API',
         'video_generation': 'Mock Image2Video API',
     }
-    provider_names = set(stage_to_provider_name.values())
+    provider_names = set(stage_to_provider_name.values()) | set(fallback_provider_name.values())
     providers = {
         provider.name: provider
         for provider in ModelProvider.objects.filter(name__in=provider_names, is_active=True)
@@ -158,6 +303,8 @@ def _ensure_default_prompt_template_set():
 
         for stage_type in stage_types:
             model_provider = providers.get(stage_to_provider_name[stage_type])
+            if not model_provider:
+                model_provider = providers.get(fallback_provider_name[stage_type])
             template, _ = PromptTemplate.objects.get_or_create(
                 template_set=template_set,
                 stage_type=stage_type,
@@ -231,7 +378,7 @@ def run_post_migrate_initialization(sender, **kwargs):
     existing_tables = set(connection.introspection.table_names())
 
     if ModelProvider._meta.db_table in existing_tables:
-        create_mock_providers()
+        create_providers()
 
     required_tables = {
         User._meta.db_table,

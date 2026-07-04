@@ -241,7 +241,8 @@ def execute_llm_stage(
                 # 更新阶段状态
                 ProjectStage.objects.filter(id=stage.id).update(
                     completed_at=timezone.now(),
-                    status='completed'
+                    status='completed',
+                    error_message=''
                 )
                 # 发布完成消息
                 publisher.publish_done(full_text, metadata)

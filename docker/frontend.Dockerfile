@@ -3,6 +3,8 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
+ARG VUE_APP_API_BASE_URL=
+
 # Copy package files
 COPY frontend/package*.json ./
 
@@ -12,8 +14,8 @@ RUN npm ci
 # Copy source code
 COPY frontend/ ./
 
-# Build the application
-RUN npm run build
+# Build the application with the API base URL
+RUN VUE_APP_API_BASE_URL=${VUE_APP_API_BASE_URL} npm run build
 
 # Production stage
 FROM nginx:1.25-alpine

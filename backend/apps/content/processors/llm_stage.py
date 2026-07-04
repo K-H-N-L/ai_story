@@ -183,10 +183,14 @@ class LLMStageProcessor(StageProcessor):
                     max_tokens=max_tokens,
                     temperature=temperature,
                     top_p=top_p,
+                    stage_type=self.stage_type,
                 ):
                     if chunk['type'] == 'token':
                         full_text = chunk['full_text']
-                        print(chunk['content'], end="")
+                        try:
+                            print(chunk['content'], end="", flush=True)
+                        except UnicodeEncodeError:
+                            pass
                         yield {
                             'type': 'token',
                             'content': chunk['content'],
@@ -511,11 +515,21 @@ class LLMStageProcessor(StageProcessor):
             # 保存到 ContentRewrite 模型
             provider = self._get_current_provider(project)
 
+            # 尝试解析JSON提取rewritten_text字段
+            final_rewritten_text = generated_text
+            try:
+                import json
+                parsed = json.loads(generated_text)
+                if isinstance(parsed, dict) and 'rewritten_text' in parsed:
+                    final_rewritten_text = parsed['rewritten_text']
+            except (json.JSONDecodeError, ValueError):
+                pass
+
             ContentRewrite.objects.update_or_create(
                 project=project,
                 defaults={
                     'original_text': project.original_topic,
-                    'rewritten_text': generated_text,
+                    'rewritten_text': final_rewritten_text,
                     'prompt_used': prompt_used,
                     'model_provider': provider,
                     'generation_metadata': metadata

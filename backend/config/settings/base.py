@@ -39,11 +39,8 @@ INSTALLED_APPS = [
     'apps.content',
     'apps.users',
     'apps.mock_api',
-    'apps.agent',
-    'apps.mcp',
     'apps.ai_proxy',
     'apps.scripts',
-    'apps.workflows',
 ]
 
 MIDDLEWARE = [
@@ -168,6 +165,19 @@ AGENT_SHOW_FREE_MODELS = os.getenv('AGENT_SHOW_FREE_MODELS', 'false').strip()
 OPENCODE_CONFIG_FILE = os.getenv('OPENCODE_CONFIG_FILE', str(Path.home() / '.config' / 'opencode' / 'opencode.json')).strip()
 OPENCODE_MANAGED_PROVIDER_PREFIX = os.getenv('OPENCODE_MANAGED_PROVIDER_PREFIX', 'ai_story').strip()
 OPENCODE_DEFAULT_PROVIDER_NPM = os.getenv('OPENCODE_DEFAULT_PROVIDER_NPM', '@ai-sdk/openai-compatible').strip()
+
+# 大模型配置（通过环境变量配置真实API）
+LLM_API_URL = os.getenv('LLM_API_URL', '').strip()
+LLM_API_KEY = os.getenv('LLM_API_KEY', '').strip()
+LLM_MODEL_NAME = os.getenv('LLM_MODEL_NAME', '').strip()
+
+TEXT2IMAGE_API_URL = os.getenv('TEXT2IMAGE_API_URL', '').strip()
+TEXT2IMAGE_API_KEY = os.getenv('TEXT2IMAGE_API_KEY', '').strip()
+TEXT2IMAGE_MODEL_NAME = os.getenv('TEXT2IMAGE_MODEL_NAME', '').strip()
+
+IMAGE2VIDEO_API_URL = os.getenv('IMAGE2VIDEO_API_URL', '').strip()
+IMAGE2VIDEO_API_KEY = os.getenv('IMAGE2VIDEO_API_KEY', '').strip()
+IMAGE2VIDEO_MODEL_NAME = os.getenv('IMAGE2VIDEO_MODEL_NAME', '').strip()
 
 # JWT配置
 SIMPLE_JWT = {

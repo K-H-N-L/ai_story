@@ -6,8 +6,30 @@ OpenAI兼容的LLM客户端实现
 import requests
 import json
 import time
+import ssl
 from typing import Dict, Any, Generator
+from requests.adapters import HTTPAdapter
+from urllib3.poolmanager import PoolManager
+from urllib3.exceptions import InsecureRequestWarning
+
 from .base import LLMClient, AIResponse
+
+
+class SSLAdapter(HTTPAdapter):
+    def init_poolmanager(self, connections, maxsize, block=False):
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        self.poolmanager = PoolManager(
+            num_pools=connections,
+            maxsize=maxsize,
+            block=block,
+            ssl_version=ssl.PROTOCOL_TLS_CLIENT,
+            ssl_context=ctx
+        )
+
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 class OpenAIClient(LLMClient):
@@ -127,12 +149,18 @@ class OpenAIClient(LLMClient):
         try:
             timeout = self.config.get('timeout', 300)
             api_url = self.api_url
-            response = requests.post(
+
+            session = requests.Session()
+            session.mount('https://', SSLAdapter())
+            session.mount('http://', SSLAdapter())
+
+            response = session.post(
                 api_url,
                 headers=headers,
                 json=payload,
                 timeout=timeout,
-                stream=True
+                stream=True,
+                verify=False
             )
 
             if response.status_code != 200:
@@ -148,7 +176,10 @@ class OpenAIClient(LLMClient):
                 if not chunk_bytes:
                     continue
 
-                buffer += chunk_bytes.decode('utf-8')
+                try:
+                    buffer += chunk_bytes.decode('utf-8')
+                except UnicodeDecodeError:
+                    buffer += chunk_bytes.decode('utf-8', errors='replace')
 
                 # 按行分割
                 while '\n' in buffer:

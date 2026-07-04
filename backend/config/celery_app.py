@@ -4,11 +4,23 @@ Celery配置
 """
 
 import os
+from pathlib import Path
 
 from celery import Celery
 from celery.signals import task_failure, task_postrun, task_prerun
 from django.conf import settings
 
+
+def load_env():
+    """从项目根目录加载 .env 文件"""
+    env_path = Path(__file__).resolve().parent.parent.parent / '.env'
+    if env_path.exists():
+        from dotenv import load_dotenv
+        load_dotenv(env_path)
+        print(f"✓ Celery已加载环境变量: {env_path}")
+
+
+load_env()
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.base')
 
 app = Celery('ai_story')

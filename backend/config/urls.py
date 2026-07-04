@@ -10,16 +10,13 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('mcp/', include('apps.mcp.urls')),
     path('api/v1/projects/', include('apps.projects.urls')),
     path('api/v1/prompts/', include('apps.prompts.urls')),
     path('api/v1/models/', include('apps.models.urls')),
     path('api/v1/content/', include('apps.content.urls')),
     path('api/v1/users/', include('apps.users.urls')),
-    path('api/v1/agent/', include('apps.agent.urls')),
     path('api/v1/ai/', include('apps.ai_proxy.urls')),
     path('api/v1/scripts/', include('apps.scripts.urls')),
-    path('api/v1/workflows/', include('apps.workflows.urls')),
     path('api/mock/', include('apps.mock_api.urls')),
 ]
 

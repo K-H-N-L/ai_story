@@ -3,13 +3,15 @@ services:
   # Redis缓存和消息队列
   redis:
     image: redis:7-alpine
-
+    restart: unless-stopped
 
   # Django后端
   backend:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
+    image: xhongc/ai_story-backend
+    restart: unless-stopped
+    volumes:
+      - ./data/backend:/app/backend/data
+      - ./storage:/app/storage
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
       - REDIS_HOST=redis
@@ -18,12 +20,13 @@ services:
 
   # Celery Worker
   celery:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    command: celery -A config worker -l info
+    image: xhongc/ai_story-backend
+    working_dir: /app/backend
+    command: celery -A config worker -l info -P gevent
+    restart: unless-stopped
     volumes:
-      - ./backend:/app/backend
+      - ./data/backend:/app/backend/data
+      - ./storage:/app/storage
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
       - REDIS_HOST=redis
@@ -35,8 +38,10 @@ services:
     build:
       context: .
       dockerfile: docker/frontend.Dockerfile
+      args:
+        - VUE_APP_API_BASE_URL=
+    restart: unless-stopped
     ports:
       - "3000:3000"
     depends_on:
       - backend
-

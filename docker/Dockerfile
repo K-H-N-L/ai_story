@@ -7,9 +7,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends --fix-missing \
     gcc \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* || (sleep 5 && apt-get update && apt-get install -y --no-install-recommends --fix-missing gcc && rm -rf /var/lib/apt/lists/*)
 
 FROM base AS builder
 

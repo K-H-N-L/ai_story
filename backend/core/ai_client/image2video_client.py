@@ -73,6 +73,11 @@ class VideoGeneratorClient:
         path = urlparse(api_url).path.rstrip('/')
         return path.endswith('/video/generations') or path.endswith('/videos/generations')
 
+    def _is_agnes_video_endpoint(self, api_url: str) -> bool:
+        """判断是否为 Agnes Video V2.0 接口。"""
+        path = urlparse(api_url).path.rstrip('/')
+        return path.endswith('/videos') or path.endswith('/v1/videos')
+
     def _build_create_video_url(self) -> str:
         """构建视频生成请求地址。"""
         return self.base_url
@@ -82,8 +87,17 @@ class VideoGeneratorClient:
         if self._is_chat_completions_endpoint(self.base_url):
             raise ValueError('chat/completions 接口不支持任务轮询')
 
-        create_url = self._build_create_video_url().rstrip('/')
-        return f"{create_url}/{task_id}"
+        if self._is_agnes_video_endpoint(self.base_url):
+            return f"{self.base_url}/{task_id}"
+        else:
+            create_url = self._build_create_video_url().rstrip('/')
+            return f"{create_url}/{task_id}"
+
+    def _build_agnes_video_status_url(self, video_id: str) -> str:
+        """构建 Agnes Video V2.0 的视频状态查询地址（推荐方式）。"""
+        parsed = urlparse(self.base_url)
+        base_api_url = f"{parsed.scheme}://{parsed.netloc}"
+        return f"{base_api_url}/agnesapi?video_id={video_id}"
 
     def _extract_video_urls(self, content: str) -> List[str]:
         """从响应内容中提取视频地址。"""
@@ -344,6 +358,56 @@ class VideoGeneratorClient:
             except requests.exceptions.RequestException as e:
                 raise Exception(f'创建视频任务失败: {str(e)}')
 
+        if self._is_agnes_video_endpoint(url):
+            payload = {
+                'model': model,
+                'prompt': final_prompt,
+            }
+            if resolved_image_base64s:
+                data_url = f'data:{image_mime_type};base64,{resolved_image_base64s[0]}'
+                payload['image'] = data_url
+            elif image_uri:
+                image_url = image_uri.get('url') if isinstance(image_uri, dict) else image_uri
+                if image_url:
+                    payload['image'] = image_url
+            if negative_prompt:
+                payload['negative_prompt'] = negative_prompt
+            fps = kwargs.get('fps', 24)
+            num_frames = kwargs.get('num_frames', 121)
+            payload['num_frames'] = num_frames
+            payload['frame_rate'] = fps
+            if aspect_ratio:
+                if aspect_ratio == '16:9':
+                    payload['width'] = 1152
+                    payload['height'] = 768
+                elif aspect_ratio == '9:16':
+                    payload['width'] = 768
+                    payload['height'] = 1152
+                elif aspect_ratio == '1:1':
+                    payload['width'] = 768
+                    payload['height'] = 768
+                elif aspect_ratio == '4:3':
+                    payload['width'] = 1024
+                    payload['height'] = 768
+                else:
+                    payload['width'] = 1152
+                    payload['height'] = 768
+
+            try:
+                response = requests.post(url, json=payload, headers=self.headers, timeout=timeout)
+                response.raise_for_status()
+                result = response.json()
+                return {
+                    'task_id': result.get('task_id') or result.get('id'),
+                    'video_id': result.get('video_id'),
+                    'status': result.get('status'),
+                    'progress': result.get('progress', 0),
+                    'seconds': result.get('seconds'),
+                    'size': result.get('size'),
+                }
+            except requests.exceptions.RequestException as e:
+                raise Exception(f'创建视频任务失败: {str(e)}')
+
         payload = {
             'width': 720,
             'height': 1280,
@@ -380,7 +444,7 @@ class VideoGeneratorClient:
             payload['personGeneration'] = person_generation
 
         try:
-            response = requests.post(url, json=payload, headers=self.headers)
+            response = requests.post(url, json=payload, headers=self.headers, timeout=timeout)
             response.raise_for_status()
             result = response.json()
             data = result.get('data')
@@ -392,9 +456,12 @@ class VideoGeneratorClient:
         except requests.exceptions.RequestException as e:
             raise Exception(f'创建视频任务失败: {str(e)}')
 
-    def get_task_status(self, task_id: str) -> Dict[str, Any]:
+    def get_task_status(self, task_id: str, video_id: str = None) -> Dict[str, Any]:
         """查询视频生成任务状态。"""
-        url = self._build_task_status_url(task_id)
+        if self._is_agnes_video_endpoint(self.base_url) and video_id:
+            url = self._build_agnes_video_status_url(video_id)
+        else:
+            url = self._build_task_status_url(task_id)
 
         try:
             response = requests.get(url, headers=self.headers)
@@ -409,6 +476,7 @@ class VideoGeneratorClient:
         poll_interval: int = 5,
         max_wait_time: int = 600,
         callback: Optional[callable] = None,
+        video_id: str = None,
     ) -> Dict[str, Any]:
         """轮询等待任务完成。"""
         start_time = time.time()
@@ -419,7 +487,7 @@ class VideoGeneratorClient:
             if elapsed_time > max_wait_time:
                 raise TimeoutError(f'任务超时: 等待时间超过 {max_wait_time} 秒')
 
-            task_info = self.get_task_status(task_id)
+            task_info = self.get_task_status(task_id, video_id)
             status = task_info.get('status')
             if status is None and "data" in task_info:
                 task_info = task_info["data"]
@@ -430,8 +498,13 @@ class VideoGeneratorClient:
                 return task_info
             if status == TaskStatus.COMPLETED.value:
                 return task_info
+            if status == 'completed':
+                return task_info
             if status == TaskStatus.FAILED.value:
                 message = task_info.get('message', '未知错误')
+                raise Exception(f'任务失败: {message}')
+            if status == 'failed':
+                message = task_info.get('error', {}).get('message', task_info.get('message', '未知错误'))
                 raise Exception(f'任务失败: {message}')
 
             time.sleep(poll_interval)
@@ -471,20 +544,31 @@ class VideoGeneratorClient:
             }
 
         task_id = task_result
+        video_id = None
         if isinstance(task_result, dict):
             task_id = task_result.get('task_id') or task_result.get('id')
+            video_id = task_result.get('video_id')
 
         result = self.wait_for_completion(
             task_id,
             poll_interval=poll_interval,
             max_wait_time=max_wait_time,
             callback=None,
+            video_id=video_id,
         )
 
         videos = result.get('data', {}).get('videos', [])
         if not videos:
             video = result.get('data', {}).get("content", {}).get("video_url")
             videos = [video]
+        if not videos:
+            video_url = result.get('remixed_from_video_id')
+            if video_url:
+                videos = [video_url]
+        if not videos:
+            video_url = result.get('video_url')
+            if video_url:
+                videos = [video_url]
         video_data = []
         for video in videos:
             url = video.get('url') if isinstance(video, dict) else video
@@ -504,5 +588,6 @@ class VideoGeneratorClient:
                 'model': kwargs.get('model') or self.model,
                 'request_url': self._build_create_video_url(),
                 'task_id': task_id,
+                'video_id': video_id,
             },
         }

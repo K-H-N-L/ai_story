@@ -426,7 +426,17 @@ class Image2VideoStageProcessor(StageProcessor):
             api_key = provider.api_key
             api_url = provider.api_url
             image_url = image_urls[0].get("url", "") if image_urls else ""
-            image_base64 = storyboard.get("url", "")
+            image_base64 = ""
+            
+            if image_url:
+                try:
+                    image_dir = Path(settings.STORAGE_ROOT) / "image"
+                    path_list = image_url.split("/")[-2:]
+                    image_path = Path(image_dir, *path_list)
+                    image_base64 = self.image_to_base64(image_path)
+                except Exception as e:
+                    logger.error(f"图片转换base64失败: {str(e)}")
+            
             camera_movement_description = self._build_camera_movement_description(project, scene_number)
             template = self._get_prompt_template(project)
             client_params = resolve_stage_client_params(
